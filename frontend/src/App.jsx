@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import EmployeePage from "./pages/EmployeePage";
 import Navbar from "./components/Navbar";
+import Landing from "./pages/Landing";
+
 
 // ✅ Route Guard
 const ProtectedRoute = ({ children, role }) => {
@@ -44,6 +46,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route path="/" element={<Landing />} />
 
       {/* ✅ Default redirect */}
       <Route path="*" element={<Navigate to="/login" replace />} />
