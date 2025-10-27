@@ -19,6 +19,8 @@ export default function Navbar() {
           <ChakraLink as={Link} to="/roles">Roles</ChakraLink>
           <ChakraLink as={Link} to="/projects">Projects</ChakraLink>
           <ChakraLink as={Link} to="/forms">Forms</ChakraLink>
+          {/* Temporary demo link so reviewers can view Employee UI without login */}
+          <ChakraLink as={Link} to="/employee-demo">Employee (demo)</ChakraLink>
         </HStack>
         <Spacer />
         <Button size="sm" variant="outline" onClick={onLogout}>Logout</Button>
