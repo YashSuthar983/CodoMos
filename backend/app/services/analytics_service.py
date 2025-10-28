@@ -168,11 +168,11 @@ class AnalyticsService:
         for stage in stages:
             stage_times = []
             for candidate in candidates:
-                stage_history = candidate.get("stage_history", [])
-                stage_entries = [h for h in stage_history if h.get("stage") == stage]
+                stage_history = getattr(candidate, 'stage_history', [])
+                stage_entries = [h for h in stage_history if getattr(h, 'stage', None) == stage]
                 if stage_entries:
-                    entry_time = stage_entries[0].get("changed_at")
-                    exit_time = stage_entries[-1].get("changed_at") if len(stage_entries) > 1 else datetime.utcnow()
+                    entry_time = getattr(stage_entries[0], 'changed_at', None)
+                    exit_time = getattr(stage_entries[-1], 'changed_at', None) if len(stage_entries) > 1 else datetime.utcnow()
                     if entry_time:
                         stage_times.append((exit_time - entry_time).days)
             avg_time_per_stage_days[stage] = statistics.mean(stage_times) if stage_times else 0
@@ -209,7 +209,7 @@ class AnalyticsService:
         predictions = []
         
         for user in users:
-            user_id = str(user["_id"])
+            user_id = str(user.id)
             
             # Calculate risk factors
             risk_factors = []
@@ -236,7 +236,7 @@ class AnalyticsService:
                 risk_score += 0.4
             
             # Factor 3: Long tenure (placeholder)
-            created_at = user.get("created_at")
+            created_at = getattr(user, 'created_at', None)
             if created_at:
                 tenure_days = (now - created_at).days
                 if tenure_days > 730:  # 2 years
@@ -254,8 +254,8 @@ class AnalyticsService:
             if risk_score >= 0.4:  # Only include medium and high risk
                 predictions.append({
                     "employee_id": user_id,
-                    "employee_name": user.get("full_name", "Unknown"),
-                    "position": user.get("position", "Unknown"),
+                    "employee_name": getattr(user, 'full_name', None) or 'Unknown',
+                    "position": getattr(user, 'position', None) or 'Unknown',
                     "attrition_risk": risk_level,
                     "risk_score": round(risk_score, 2),
                     "risk_factors": risk_factors,
@@ -270,27 +270,28 @@ class AnalyticsService:
         predictions = []
         
         for project in projects:
-            project_id = str(project["_id"])
+            project_id = str(project.id)
             risk_factors = []
             risk_score = 0.0
             estimated_delay = 0
             
             # Factor 1: Team size
-            team_size = len(project.get("members", []))
+            members = getattr(project, 'members', [])
+            team_size = len(members) if members else 0
             if team_size < 2:
                 risk_factors.append("Understaffed team")
                 risk_score += 0.3
                 estimated_delay += 15
             
             # Factor 2: Project health
-            health = project.get("health", "unknown")
+            health = getattr(project, 'health', 'unknown')
             if health in ["at_risk", "critical"]:
                 risk_factors.append(f"Poor health status: {health}")
                 risk_score += 0.4
                 estimated_delay += 30
             
             # Factor 3: Deadline proximity
-            end_date = project.get("end_date")
+            end_date = getattr(project, 'end_date', None)
             if end_date:
                 days_remaining = (end_date - datetime.utcnow()).days
                 if days_remaining < 14:
@@ -298,7 +299,7 @@ class AnalyticsService:
                     risk_score += 0.2
             
             # Factor 4: Recent activity
-            member_ids = [m.get("user_id") for m in project.get("members", [])]
+            member_ids = [m.user_id for m in members if hasattr(m, 'user_id')]
             if member_ids:
                 recent_commits = await XPEvent.find({
                     "person_id": {"$in": member_ids},
@@ -321,7 +322,7 @@ class AnalyticsService:
             if risk_score >= 0.3:
                 predictions.append({
                     "project_id": project_id,
-                    "project_name": project.get("name", "Unknown"),
+                    "project_name": getattr(project, 'name', 'Unknown'),
                     "risk_level": risk_level,
                     "risk_score": round(risk_score, 2),
                     "risk_factors": risk_factors,

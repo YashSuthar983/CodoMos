@@ -22,7 +22,7 @@ async def get_form_public(form_id: str):
     return form
 
 
-@router.post("/{form_id}/responses", response_model=FormResponseOut)
+@router.post("/{form_id}/responses")
 async def submit_form_public(
     form_id: str,
     payload: str = FastAPIForm(...),  # JSON string of form data
