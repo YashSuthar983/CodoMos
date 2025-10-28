@@ -29,5 +29,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
+    # Public base URL (scheme + host[:port]) for constructing webhook callback URLs
+    # Example: http://127.0.0.1:8000 or https://api.example.com
+    PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8000")
+
 
 settings = Settings()  # type: ignore

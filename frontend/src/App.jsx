@@ -10,10 +10,17 @@ import Dashboard from './pages/Dashboard'
 import Candidates from './pages/Candidates'
 import Roles from './pages/Roles'
 import Projects from './pages/Projects'
+import ProjectDetail from './pages/ProjectDetail'
+import ProjectNew from './pages/ProjectNew'
 import Forms from './pages/Forms'
 import FormBuilder from './pages/FormBuilder'
 import FormResponses from './pages/FormResponses'
 import PublicForm from './pages/PublicForm'
+import RepositoryInsights from './pages/RepositoryInsights'
+import Settings from './pages/Settings'
+import Users from './pages/Users'
+import EmployeeProfile from './pages/EmployeeProfile'
+import Leaderboard from './pages/Leaderboard'
 
 export default function App() {
   return (
@@ -25,6 +32,16 @@ export default function App() {
 
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Navbar />
@@ -61,6 +78,24 @@ export default function App() {
           }
         />
         <Route
+          path="/projects/new"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <ProjectNew />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <ProjectDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/forms"
           element={
             <ProtectedRoute>
@@ -84,6 +119,51 @@ export default function App() {
             <ProtectedRoute>
               <Navbar />
               <FormResponses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insights"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <RepositoryInsights />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Users />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/:userId/profile"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <EmployeeProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leaderboard"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Leaderboard />
             </ProtectedRoute>
           }
         />

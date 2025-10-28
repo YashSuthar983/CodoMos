@@ -26,6 +26,7 @@ async def signup(user_in: UserCreate):
         email=user_in.email,
         full_name=user_in.full_name,
         role=user_in.role or "user",
+        position=user_in.position,
         hashed_password=get_password_hash(user_in.password),
     )
     await user.insert()

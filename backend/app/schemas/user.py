@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     role: Optional[str] = None
+    position: Optional[str] = None
     github_username: Optional[str] = None
 
 
@@ -16,7 +17,10 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     role: Optional[str] = None
+    position: Optional[str] = None
     github_username: Optional[str] = None
+    github_pat: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class UserOut(UserBase):
