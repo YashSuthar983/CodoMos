@@ -1110,6 +1110,7 @@ async def analyze_candidate_with_ai(
             raise HTTPException(status_code=400, detail="Could not load form response")
     
     # Run AI analysis
+    print(f"[AI Analysis] Running analysis on form response...")
     analysis = analyze_form_response(
         form_response=form_response.payload,
         position=candidate.position_applied,
@@ -1122,14 +1123,23 @@ async def analyze_candidate_with_ai(
         ]
     )
     
+    print(f"[AI Analysis] ✅ Analysis complete!")
+    print(f"[AI Analysis] Result keys: {list(analysis.keys())}")
+    print(f"[AI Analysis] Overall score: {analysis.get('overall_score')}")
+    print(f"[AI Analysis] Technical score: {analysis.get('technical_score')}")
+    print(f"[AI Analysis] Strengths count: {len(analysis.get('strengths', []))}")
+    print(f"[AI Analysis] Full result: {analysis}")
+    
     # Update candidate with AI suggestions (not final scores)
     candidate.ai_analysis = analysis
     candidate.ai_analyzed_at = datetime.utcnow()
     candidate.ai_confidence = analysis.get("confidence_level", "medium")
     candidate.updated_at = datetime.utcnow()
     
+    print(f"[AI Analysis] Saving to candidate...")
     # DO NOT automatically update scores - just store suggestions
     await candidate.save()
+    print(f"[AI Analysis] ✅ Saved successfully!")
     
     return {
         "message": "AI analysis complete - review suggestions before making decisions",
@@ -1408,7 +1418,7 @@ async def create_job_posting(
                 {"type": "text", "label": "Years of Experience", "name": "years_experience", "required": False},
                 {"type": "textarea", "label": "Technical Skills", "name": "skills", "required": False},
                 {"type": "text", "label": "Expected Salary", "name": "expected_salary", "required": False},
-                {"type": "text", "label": "Resume URL (Google Drive, Dropbox, etc.)", "name": "resume_url", "required": False}
+                {"type": "file", "label": "Upload Resume (PDF, DOCX, TXT)", "name": "resume_file", "required": False, "accept": ".pdf,.docx,.txt,.doc"}
             ]
         }
         
@@ -1607,4 +1617,83 @@ async def publish_job(
         "message": "Job published successfully",
         "public_url": f"/apply/{job.id}",
         "application_form_url": f"/public/forms/{job.application_form_id}" if job.application_form_id else None
+    }
+
+
+@router.post("/jobs/{job_id}/bulk-analyze")
+async def bulk_analyze_candidates_for_job(job_id: str, current_user: User = Depends(require_admin)):
+    """
+    Run AI analysis on all candidates with resumes for this specific job.
+    Only analyzes candidates who have resume_text but haven't been analyzed yet.
+    """
+    job = await JobPosting.get(PydanticObjectId(job_id))
+    if not job:
+        raise HTTPException(status_code=404, detail="Job posting not found")
+    
+    # Find all candidates for this job with resumes
+    candidates = await Candidate.find(
+        Candidate.job_posting_id == job.id,
+        Candidate.resume_text != None
+    ).to_list()
+    
+    if not candidates:
+        return {
+            "message": "No candidates with resumes found for this job",
+            "analyzed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0
+        }
+    
+    analyzed_count = 0
+    skipped_count = 0
+    failed_count = 0
+    
+    for candidate in candidates:
+        # Skip if already analyzed
+        if candidate.ai_analyzed_at:
+            skipped_count += 1
+            continue
+        
+        # Skip if no resume text
+        if not candidate.resume_text or len(candidate.resume_text) < 50:
+            skipped_count += 1
+            continue
+        
+        try:
+            from app.services.ai_hiring_assistant import analyze_resume_for_job
+            from datetime import datetime
+            
+            print(f"\n🤖 Bulk Analysis: Analyzing {candidate.full_name}...")
+            
+            analysis_result = analyze_resume_for_job(
+                resume_text=candidate.resume_text,
+                job_title=job.title,
+                job_description=job.description,
+                requirements=job.requirements,
+                nice_to_have=job.nice_to_have
+            )
+            
+            if analysis_result.get('ai_analyzed'):
+                candidate.overall_score = analysis_result['match_score']
+                candidate.technical_score = analysis_result['technical_match']
+                candidate.ai_analysis = analysis_result
+                candidate.ai_analyzed_at = datetime.utcnow()
+                candidate.ai_confidence = analysis_result['confidence_level']
+                await candidate.save()
+                analyzed_count += 1
+                print(f"✅ {candidate.full_name}: {candidate.overall_score}%")
+            else:
+                failed_count += 1
+                print(f"⚠️  {candidate.full_name}: Analysis returned no results")
+        
+        except Exception as e:
+            failed_count += 1
+            print(f"❌ {candidate.full_name}: {str(e)}")
+    
+    return {
+        "message": f"Bulk analysis complete! Analyzed {analyzed_count} candidates.",
+        "analyzed_count": analyzed_count,
+        "skipped_count": skipped_count,
+        "failed_count": failed_count,
+        "total_candidates": len(candidates)
     }

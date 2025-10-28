@@ -26,6 +26,7 @@ aiohttp==3.9.3
 pandas==2.2.2
 numpy==1.26.4
 python-dateutil==2.9.0
+PyPDF2==3.0.1
 
 # Caching and performance
 redis==5.0.1

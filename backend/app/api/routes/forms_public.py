@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form as FastAPIForm, Depends
 from beanie import PydanticObjectId
 import httpx
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import secrets
 import string
+import io
+import PyPDF2
 
 from app.models import Form, FormResponse, Candidate, Task, User, HiringTask, TaskSubmission, JobPosting
 from app.schemas.form import FormOut, FormResponseCreate, FormResponseOut
@@ -21,19 +23,66 @@ async def get_form_public(form_id: str):
 
 
 @router.post("/{form_id}/responses", response_model=FormResponseOut)
-async def submit_form_public(form_id: str, payload: FormResponseCreate):
+async def submit_form_public(
+    form_id: str,
+    payload: str = FastAPIForm(...),  # JSON string of form data
+    resume_file: Optional[UploadFile] = File(None)  # Optional file upload
+):
+    """Submit form with optional file upload (resume PDF)"""
+    import json
+    
     form = await Form.get(PydanticObjectId(form_id))
     if not form or not form.published:
         raise HTTPException(status_code=404, detail="Form not available")
-    resp = FormResponse(form_id=PydanticObjectId(form_id), mapped_entity=payload.mapped_entity, payload=payload.payload)
+    
+    # Parse JSON payload
+    try:
+        payload_data = json.loads(payload)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid payload format")
+    
+    # Extract resume text from file if uploaded
+    resume_text = None
+    resume_filename = None
+    if resume_file:
+        resume_filename = resume_file.filename
+        file_content = await resume_file.read()
+        
+        # Extract text based on file type
+        file_ext = resume_file.filename.lower().split('.')[-1] if resume_file.filename else ''
+        if file_ext == 'pdf':
+            try:
+                pdf_file = io.BytesIO(file_content)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                resume_text = ""
+                for page in pdf_reader.pages:
+                    resume_text += page.extract_text() + "\n"
+            except Exception as e:
+                print(f"⚠️  PDF extraction failed: {e}")
+                resume_text = "[PDF uploaded - text extraction failed]"
+        elif file_ext == 'txt':
+            resume_text = file_content.decode('utf-8', errors='ignore')
+        else:
+            resume_text = f"[{file_ext.upper()} file uploaded - text extraction not implemented]"
+        
+        print(f"📄 Resume uploaded: {resume_filename} ({len(resume_text)} chars extracted)")
+    
+    resp = FormResponse(
+        form_id=PydanticObjectId(form_id),
+        mapped_entity=payload_data.get('mapped_entity'),
+        payload=payload_data.get('payload', {})
+    )
     await resp.insert()
+    
+    # Store credentials if new candidate created
+    new_candidate_credentials = None
 
     # Auto-create candidate if this is a job application form (public submission)
     if form.mapping and form.mapping.get("entity_type") == "candidate":
         job_posting_id = form.mapping.get("job_posting_id")
 
         # Extract candidate data from form payload
-        form_data = payload.payload or {}
+        form_data = payload_data.get('payload', {})
 
         # Check if candidate already exists (by email)
         existing = await Candidate.find_one(Candidate.email == form_data.get("email"))
@@ -47,24 +96,54 @@ async def submit_form_public(form_id: str, payload: FormResponseCreate):
                 position_applied=form_data.get("position", "Not specified"),
                 linkedin_url=form_data.get("linkedin_url"),
                 github_username=form_data.get("github_username"),
-                resume_url=form_data.get("resume_url"),
+                resume_url=resume_filename if resume_filename else form_data.get("resume_url"),
+                resume_text=resume_text,  # Store extracted resume text
                 expected_salary=float(form_data.get("expected_salary")) if form_data.get("expected_salary") else None,
                 source="Public Application Form",
                 application_form_id=form.id,
                 form_responses=[resp.id],
                 notes=f"Motivation: {form_data.get('motivation', '')}\n\nExperience: {form_data.get('experience', '')}\n\nSkills: {form_data.get('skills', '')}"
             )
-            # If job posting exists, use its title for position
+            # If job posting exists, link it and use its title for position
             if job_posting_id:
                 try:
                     from app.models import JobPosting
                     job = await JobPosting.get(PydanticObjectId(job_posting_id))
                     if job:
                         candidate.position_applied = job.title
+                        candidate.job_posting_id = job.id  # Link to job posting
                 except Exception:
                     pass
 
             await candidate.insert()
+            
+            # Run AI analysis if resume text was extracted and job exists
+            if resume_text and job_posting_id and len(resume_text) > 50:
+                try:
+                    from app.services.ai_hiring_assistant import analyze_resume_for_job
+                    from datetime import datetime
+                    
+                    job = await JobPosting.get(PydanticObjectId(job_posting_id))
+                    if job:
+                        print(f"\n🤖 Running AI analysis on resume for {candidate.full_name}...")
+                        analysis_result = analyze_resume_for_job(
+                            resume_text=resume_text,
+                            job_title=job.title,
+                            job_description=job.description,
+                            requirements=job.requirements,
+                            nice_to_have=job.nice_to_have
+                        )
+                        
+                        if analysis_result.get('ai_analyzed'):
+                            candidate.overall_score = analysis_result['match_score']
+                            candidate.technical_score = analysis_result['technical_match']
+                            candidate.ai_analysis = analysis_result
+                            candidate.ai_analyzed_at = datetime.utcnow()
+                            candidate.ai_confidence = analysis_result['confidence_level']
+                            await candidate.save()
+                            print(f"✅ AI Analysis complete! Match score: {candidate.overall_score}%")
+                except Exception as e:
+                    print(f"⚠️  AI analysis failed: {e}")
 
             # Auto-assign tasks for the candidate's initial stage
             await auto_assign_tasks_for_candidate(candidate, candidate.current_stage)
@@ -83,13 +162,23 @@ async def submit_form_public(form_id: str, payload: FormResponseCreate):
             )
             await user.insert()
             
-            # Send email with credentials
-            await send_candidate_welcome_email(
-                email=candidate.email,
-                full_name=candidate.full_name,
-                password=random_password,
-                position=candidate.position_applied
-            )
+            # Store credentials to return in response (no SMTP needed)
+            new_candidate_credentials = {
+                "email": candidate.email,
+                "password": random_password,
+                "full_name": candidate.full_name,
+                "position": candidate.position_applied,
+                "portal_url": "http://localhost:5173/login"  # Update with your actual URL
+            }
+            
+            # Print credentials to console (for development)
+            print(f"\n" + "="*60)
+            print("📧 CANDIDATE CREDENTIALS (No SMTP - Show in Popup)")
+            print("="*60)
+            print(f"Email: {candidate.email}")
+            print(f"Password: {random_password}")
+            print(f"Portal: http://localhost:5173/login")
+            print("="*60 + "\n")
 
             # Link response to candidate
             resp.mapped_entity = {"type": "candidate", "id": str(candidate.id)}
@@ -103,6 +192,13 @@ async def submit_form_public(form_id: str, payload: FormResponseCreate):
             # Link response to existing candidate
             resp.mapped_entity = {"type": "candidate", "id": str(existing.id)}
             await resp.save()
+            
+            # Note: For existing candidates, credentials already exist
+            new_candidate_credentials = {
+                "existing_candidate": True,
+                "email": existing.email,
+                "message": "You already have an account. Please use your existing credentials."
+            }
 
     # Minimal triggers allowed for public as well
     if form.triggers:
@@ -142,8 +238,19 @@ async def submit_form_public(form_id: str, payload: FormResponseCreate):
                             await client.post(url, json=payload_rendered)
                     except Exception:
                         pass
-
-    return resp
+    
+    # Return response with credentials if new candidate was created
+    response_data = {
+        "id": str(resp.id),
+        "form_id": str(resp.form_id),
+        "mapped_entity": resp.mapped_entity,
+        "created_at": resp.created_at.isoformat() if resp.created_at else None
+    }
+    
+    if new_candidate_credentials:
+        response_data["credentials"] = new_candidate_credentials
+    
+    return response_data
 
 
 async def auto_assign_tasks_for_candidate(candidate: Candidate, stage: str):
