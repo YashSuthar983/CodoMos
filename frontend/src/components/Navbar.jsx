@@ -3,6 +3,8 @@ import { Box, Flex, HStack, Link as ChakraLink, Button, Spacer, Text, Icon } fro
 import { Link, useNavigate } from 'react-router-dom'
 import { FaRocket } from 'react-icons/fa'
 import api from '../api/client'
+import NotificationBell from './NotificationBell'
+import CogniBot from './CogniBot'
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -144,6 +146,10 @@ export default function Navbar() {
           )}
         </HStack>
         <Spacer />
+        <HStack spacing={3}>
+          <NotificationBell />
+          <Button size="sm" variant="outline" onClick={onLogout}>Logout</Button>
+        </HStack>
         <Button 
           size="md" 
           bgGradient="linear(to-r, cyan.400, blue.500)" 
@@ -155,6 +161,8 @@ export default function Navbar() {
           Logout
         </Button>
       </Flex>
+      {/* Floating CogniBot lives here so it's global */}
+      <CogniBot />
     </Box>
   )
 }

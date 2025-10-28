@@ -9,6 +9,7 @@ import {
 import { ArrowBackIcon } from '@chakra-ui/icons'
 import { FaGithub, FaTrophy, FaProjectDiagram, FaStar } from 'react-icons/fa'
 import api from '../api/client'
+import MessagingPanel from '../components/MessagingPanel'
 
 export default function EmployeeProfile() {
   const { userId } = useParams()
@@ -101,6 +102,14 @@ export default function EmployeeProfile() {
               )}
             </VStack>
           </Flex>
+        </CardBody>
+      </Card>
+
+      {/* Message Panel */}
+      <Card mb={6}>
+        <CardBody>
+          <Heading size="md" mb={4}>Message {user.full_name || user.email}</Heading>
+          <MessagingPanel targetUserId={user.id} targetUserEmail={user.email} />
         </CardBody>
       </Card>
 

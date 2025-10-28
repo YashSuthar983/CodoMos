@@ -24,6 +24,12 @@ from app.models.github_data import (
     IssueState,
     PRState
 )
+from app.models.message import Message, Attachment
+from app.models.channel import Channel
+from app.models.announcement import Announcement
+from app.models.notification import Notification
+from app.models.notification_preference import NotificationPreference
+from app.models.email_template import EmailTemplate
 from app.models.performance import (
     PerformanceReview,
     Goal,
@@ -44,6 +50,8 @@ __all__ = [
     "RepositoryMetadata", "Branch", "Commit", "Issue", "PullRequest", 
     "Contributor", "Release", "Milestone", "ProjectBoard", "Activity",
     "XPLeaderboard", "IssueState", "PRState",
+    "Message", "Attachment", "Channel", "Announcement", "Notification",
+    "NotificationPreference", "EmailTemplate"
     "PerformanceReview", "Goal", "OneOnOneMeeting", "PerformanceImprovementPlan",
     "ReviewCycle", "MeetingTemplate", "ReviewStatus", "GoalStatus", "MeetingStatus"
 ]
