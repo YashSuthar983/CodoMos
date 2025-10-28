@@ -26,6 +26,12 @@ from app.models import (
     ProjectBoard,
     Activity,
     XPLeaderboard,
+    Message,
+    Channel,
+    Announcement,
+    Notification,
+    NotificationPreference,
+    EmailTemplate,
 )
 
 _client: AsyncIOMotorClient | None = None
@@ -60,6 +66,12 @@ async def init_mongo() -> None:
             ProjectBoard,
             Activity,
             XPLeaderboard,
+            Message,
+            Channel,
+            Announcement,
+            Notification,
+            NotificationPreference,
+            EmailTemplate,
         ],
     )
 

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Box, Flex, HStack, Link as ChakraLink, Button, Spacer, Text } from '@chakra-ui/react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import NotificationBell from './NotificationBell'
+import CogniBot from './CogniBot'
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -45,8 +47,13 @@ export default function Navbar() {
           )}
         </HStack>
         <Spacer />
-        <Button size="sm" variant="outline" onClick={onLogout}>Logout</Button>
+        <HStack spacing={3}>
+          <NotificationBell />
+          <Button size="sm" variant="outline" onClick={onLogout}>Logout</Button>
+        </HStack>
       </Flex>
+      {/* Floating CogniBot lives here so it's global */}
+      <CogniBot />
     </Box>
   )
 }
