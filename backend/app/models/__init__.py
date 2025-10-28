@@ -1,5 +1,7 @@
 from app.models.user import User
-from app.models.candidate import Candidate
+from app.models.candidate import Candidate, InterviewNote, HiringStage
+from app.models.hiring_task import HiringTask, TaskSubmission, OnboardingTask, TaskType, TaskStatus
+from app.models.job_posting import JobPosting, JobStatus, JobType
 from app.models.role import JobRole
 from app.models.repo import Repo
 from app.models.project import Project
@@ -22,11 +24,26 @@ from app.models.github_data import (
     IssueState,
     PRState
 )
+from app.models.performance import (
+    PerformanceReview,
+    Goal,
+    OneOnOneMeeting,
+    PerformanceImprovementPlan,
+    ReviewCycle,
+    MeetingTemplate,
+    ReviewStatus,
+    GoalStatus,
+    MeetingStatus
+)
 
 __all__ = [
-    "User", "Candidate", "JobRole", "Repo", "Project", "Task", "Form", "FormResponse",
+    "User", "Candidate", "InterviewNote", "HiringStage", "JobRole", "Repo", "Project", "Task", "Form", "FormResponse",
+    "HiringTask", "TaskSubmission", "OnboardingTask", "TaskType", "TaskStatus",
+    "JobPosting", "JobStatus", "JobType",
     "XPEvent", "XPSource", "XPConfiguration", "AppSettings",
     "RepositoryMetadata", "Branch", "Commit", "Issue", "PullRequest", 
     "Contributor", "Release", "Milestone", "ProjectBoard", "Activity",
-    "XPLeaderboard", "IssueState", "PRState"
+    "XPLeaderboard", "IssueState", "PRState",
+    "PerformanceReview", "Goal", "OneOnOneMeeting", "PerformanceImprovementPlan",
+    "ReviewCycle", "MeetingTemplate", "ReviewStatus", "GoalStatus", "MeetingStatus"
 ]

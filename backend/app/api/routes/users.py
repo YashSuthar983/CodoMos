@@ -76,29 +76,13 @@ async def update_me(payload: UserUpdate, request: Request):
 
 
 async def _get_user_by_id_any(user_id: str) -> User | None:
-    """Fetch a user by id regardless of whether _id is stored as ObjectId or string.
-
-    Some older documents may have string _id due to custom bson_encoders.
-    This helper tries both lookups to be robust.
-    """
-    # Try ObjectId lookup
-    try:
-        oid = PydanticObjectId(user_id)
-        user = await User.get(oid)
-        if user:
+    """Fetch user by matching ID as string - workaround for bson_encoders issue."""
+    # Due to User model having bson_encoders={ObjectId: str}, we need to 
+    # fetch all users and match by string comparison
+    all_users = await User.find_all().to_list()
+    for user in all_users:
+        if str(user.id) == str(user_id):
             return user
-    except Exception:
-        # Not a valid ObjectId string
-        pass
-
-    # Fallback: raw lookup by string _id
-    try:
-        user = await User.find_one({"_id": user_id})
-        if user:
-            return user
-    except Exception:
-        pass
-
     return None
 
 @router.get("/", response_model=List[UserOut])

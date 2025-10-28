@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     role: Optional[str] = None
     position: Optional[str] = None
     github_username: Optional[str] = None
+    candidate_id: Optional[Any] = None
 
 
 class UserCreate(UserBase):
@@ -21,6 +22,7 @@ class UserUpdate(BaseModel):
     github_username: Optional[str] = None
     github_pat: Optional[str] = None
     is_active: Optional[bool] = None
+    candidate_id: Optional[Any] = None
 
 
 class UserOut(UserBase):
@@ -31,6 +33,10 @@ class UserOut(UserBase):
     @field_serializer('id')
     def serialize_id(self, v):
         return str(v)
+    
+    @field_serializer('candidate_id')
+    def serialize_candidate_id(self, v):
+        return str(v) if v else None
 
 
 class Token(BaseModel):

@@ -16,10 +16,14 @@ import IssuesAndPRsPanel from '../components/insights/IssuesAndPRsPanel'
 import ContributorsPanel from '../components/insights/ContributorsPanel'
 import MilestonesPanel from '../components/insights/MilestonesPanel'
 import XPLeaderboardPanel from '../components/insights/XPLeaderboardPanel'
+import TeamContributionsPanel from '../components/insights/TeamContributionsPanel'
 
 export default function RepositoryInsights() {
   const [selectedRepo, setSelectedRepo] = useState(null)
   const [repos, setRepos] = useState([])
+  const [projects, setProjects] = useState([])
+  const [currentProject, setCurrentProject] = useState(null)
+  const [memberStats, setMemberStats] = useState(null)
   const [data, setData] = useState({
     metadata: null,
     branches: [],
@@ -52,21 +56,26 @@ export default function RepositoryInsights() {
 
   // Load data when repo is selected
   useEffect(() => {
-    if (selectedRepo) {
+    if (selectedRepo && projects.length > 0) {
       loadRepositoryData()
     }
-  }, [selectedRepo])
+  }, [selectedRepo, projects])
 
   const loadRepos = async () => {
     try {
-      const response = await api.get('/projects/repos')
-      setRepos(response.data)
+      const [reposRes, projectsRes] = await Promise.all([
+        api.get('/projects/repos'),
+        api.get('/projects')
+      ])
+      setRepos(reposRes.data)
+      setProjects(projectsRes.data)
+      
       const params = new URLSearchParams(location.search)
       const repoIdParam = params.get('repoId')
-      if (repoIdParam && response.data.some(r => String(r.id) === String(repoIdParam))) {
+      if (repoIdParam && reposRes.data.some(r => String(r.id) === String(repoIdParam))) {
         setSelectedRepo(repoIdParam)
-      } else if (response.data.length > 0 && !selectedRepo) {
-        setSelectedRepo(response.data[0].id)
+      } else if (reposRes.data.length > 0 && !selectedRepo) {
+        setSelectedRepo(reposRes.data[0].id)
       }
     } catch (error) {
       toast({
@@ -82,6 +91,23 @@ export default function RepositoryInsights() {
     
     setLoading(true)
     try {
+      // Find project that contains this repo
+      const project = projects.find(p => p.repo_ids?.includes(selectedRepo))
+      setCurrentProject(project)
+      
+      // Load project member stats if project found
+      if (project) {
+        try {
+          const statsRes = await api.get(`/projects/${project.id}/members/stats`)
+          setMemberStats(statsRes.data)
+        } catch (err) {
+          console.error('Failed to load member stats:', err)
+          setMemberStats(null)
+        }
+      } else {
+        setMemberStats(null)
+      }
+      
       // Load all data in parallel
       const [
         metadataRes,
@@ -347,6 +373,7 @@ export default function RepositoryInsights() {
               <Tab>Contributors</Tab>
               <Tab>Milestones</Tab>
               <Tab>XP & Gamification</Tab>
+              {currentProject && memberStats && <Tab>Team Contributions</Tab>}
             </TabList>
             
             <TabPanels>
@@ -375,6 +402,15 @@ export default function RepositoryInsights() {
               <TabPanel>
                 <XPLeaderboardPanel leaderboard={data.leaderboard} />
               </TabPanel>
+              {currentProject && memberStats && (
+                <TabPanel>
+                  <TeamContributionsPanel 
+                    project={currentProject} 
+                    memberStats={memberStats}
+                    navigate={navigate}
+                  />
+                </TabPanel>
+              )}
             </TabPanels>
           </Tabs>
         )}

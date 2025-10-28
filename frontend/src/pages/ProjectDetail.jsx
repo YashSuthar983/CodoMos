@@ -16,6 +16,7 @@ export default function ProjectDetail() {
   const [ghRepos, setGhRepos] = useState([])
   const [ghReposLoading, setGhReposLoading] = useState(false)
   const [showGithubWizard, setShowGithubWizard] = useState(false)
+  const [memberStats, setMemberStats] = useState(null)
   const toast = useToast()
 
   // Team & Settings state
@@ -37,16 +38,18 @@ export default function ProjectDetail() {
 
   const load = async () => {
     try {
-      const [projRes, reposRes, usersRes, xpRes] = await Promise.all([
+      const [projRes, reposRes, usersRes, xpRes, statsRes] = await Promise.all([
         api.get(`/projects/${projectId}`),
         api.get('/projects/repos'),
         api.get('/users'),
-        api.get('/xp/events')
+        api.get('/xp/events'),
+        api.get(`/projects/${projectId}/members/stats`).catch(() => ({ data: null }))
       ])
       setProject(projRes.data)
       setAllRepos(reposRes.data)
       setAllUsers(usersRes.data)
       setXpEvents(xpRes.data)
+      setMemberStats(statsRes.data)
     } catch (e) {
       toast({ title: 'Failed to load project', status: 'error' })
       navigate('/dashboard')
@@ -517,10 +520,97 @@ export default function ProjectDetail() {
           </CardBody>
         </Card>
 
+        {/* Team Member Contributions */}
+        {memberStats && memberStats.members && memberStats.members.length > 0 && (
+          <Card mt={6}>
+            <CardBody>
+              <Heading size="md" mb={4}>Team Contributions</Heading>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4} mb={6}>
+                {memberStats.members.map(member => (
+                  <Card key={member.user_id} variant="outline" bg="gray.50">
+                    <CardBody>
+                      <VStack align="stretch" spacing={3}>
+                        <Flex justify="space-between" align="center">
+                          <Box>
+                            <Text fontWeight="bold" fontSize="lg">{member.full_name}</Text>
+                            <Text fontSize="sm" color="gray.600">{member.position || 'Team Member'}</Text>
+                          </Box>
+                          <Badge colorScheme={member.role === 'owner' ? 'purple' : member.role === 'maintainer' ? 'blue' : 'green'}>
+                            {member.role}
+                          </Badge>
+                        </Flex>
+                        
+                        <Divider />
+                        
+                        <SimpleGrid columns={2} spacing={2}>
+                          <Stat size="sm">
+                            <StatLabel>Total XP</StatLabel>
+                            <StatNumber color="purple.500">{member.stats.total_xp}</StatNumber>
+                          </Stat>
+                          <Stat size="sm">
+                            <StatLabel>Events</StatLabel>
+                            <StatNumber>{member.stats.xp_events_count}</StatNumber>
+                          </Stat>
+                        </SimpleGrid>
+                        
+                        {member.stats.top_skill && (
+                          <Box>
+                            <Text fontSize="xs" color="gray.600" mb={1}>Top Skill</Text>
+                            <Badge colorScheme="cyan">{member.stats.top_skill}</Badge>
+                          </Box>
+                        )}
+                        
+                        {member.recent_activity && member.recent_activity.length > 0 && (
+                          <Box>
+                            <Text fontSize="xs" color="gray.600" mb={2}>Recent Activity</Text>
+                            <VStack align="stretch" spacing={1}>
+                              {member.recent_activity.slice(0, 3).map((activity, idx) => (
+                                <Flex key={idx} justify="space-between" fontSize="xs">
+                                  <Text color="gray.700">{activity.source}</Text>
+                                  <Badge size="sm" colorScheme="green">+{activity.amount} XP</Badge>
+                                </Flex>
+                              ))}
+                            </VStack>
+                          </Box>
+                        )}
+                        
+                        <Button size="sm" variant="ghost" onClick={() => navigate(`/users/${member.user_id}/profile`)}>
+                          View Profile
+                        </Button>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                ))}
+              </SimpleGrid>
+              
+              <Box bg="blue.50" p={4} rounded="md" borderWidth={1} borderColor="blue.200">
+                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+                  <Stat>
+                    <StatLabel>Team Size</StatLabel>
+                    <StatNumber>{memberStats.member_count}</StatNumber>
+                  </Stat>
+                  <Stat>
+                    <StatLabel>Total Project XP</StatLabel>
+                    <StatNumber color="purple.600">{memberStats.total_project_xp}</StatNumber>
+                  </Stat>
+                  <Stat>
+                    <StatLabel>Avg XP per Member</StatLabel>
+                    <StatNumber>{memberStats.member_count > 0 ? Math.round(memberStats.total_project_xp / memberStats.member_count) : 0}</StatNumber>
+                  </Stat>
+                  <Stat>
+                    <StatLabel>Project Activity</StatLabel>
+                    <StatNumber>{xpEvents.length} Events</StatNumber>
+                  </Stat>
+                </SimpleGrid>
+              </Box>
+            </CardBody>
+          </Card>
+        )}
+
         {/* Team Management */}
         <Card mt={6}>
           <CardBody>
-            <Heading size="md" mb={4}>Team</Heading>
+            <Heading size="md" mb={4}>Team Management</Heading>
             <form onSubmit={addMember}>
               <HStack mb={4} align="flex-end">
                 <FormControl maxW="320px">

@@ -113,7 +113,22 @@ async def get_repository_branches(
     if not include_stale:
         query = query.find(Branch.is_stale == False)
     
-    return await query.to_list()
+    results = await query.to_list()
+    
+    # Auto-sync if empty and PAT is configured
+    if not results and not refresh:
+        settings = await AppSettings.get_app_settings()
+        github_pat = settings.get_github_pat()
+        if github_pat and repo.owner and repo.repo_name:
+            try:
+                service = GitHubInsightsService(github_pat)
+                await service.sync_branches(repo)
+                # Re-query after sync
+                results = await query.to_list()
+            except Exception:
+                pass  # Return empty list if auto-sync fails
+    
+    return results
 
 
 @router.get("/repos/{repo_id}/commits", response_model=List[CommitOut])
@@ -146,7 +161,22 @@ async def get_repository_commits(
     if since:
         query = query.find(Commit.author_date >= since)
     
-    return await query.sort(-Commit.author_date).limit(limit).to_list()
+    results = await query.sort(-Commit.author_date).limit(limit).to_list()
+    
+    # Auto-sync if empty and PAT is configured
+    if not results and not refresh:
+        settings = await AppSettings.get_app_settings()
+        github_pat = settings.get_github_pat()
+        if github_pat and repo.owner and repo.repo_name:
+            try:
+                service = GitHubInsightsService(github_pat)
+                await service.sync_recent_commits(repo, limit)
+                # Re-query after sync
+                results = await query.sort(-Commit.author_date).limit(limit).to_list()
+            except Exception:
+                pass  # Return empty list if auto-sync fails
+    
+    return results
 
 
 @router.get("/repos/{repo_id}/commit-velocity")
@@ -249,7 +279,22 @@ async def get_repository_issues(
     else:
         query = query.sort(-Issue.created_at)
     
-    return await query.to_list()
+    results = await query.to_list()
+    
+    # Auto-sync if empty and PAT is configured
+    if not results and not refresh:
+        settings = await AppSettings.get_app_settings()
+        github_pat = settings.get_github_pat()
+        if github_pat and repo.owner and repo.repo_name:
+            try:
+                service = GitHubInsightsService(github_pat)
+                await service.sync_issues(repo, state)
+                # Re-query after sync
+                results = await query.to_list()
+            except Exception:
+                pass  # Return empty list if auto-sync fails
+    
+    return results
 
 
 @router.get("/repos/{repo_id}/pull-requests", response_model=List[PullRequestOut])
@@ -297,7 +342,22 @@ async def get_repository_pull_requests(
     else:
         query = query.sort(-PullRequest.created_at)
     
-    return await query.to_list()
+    results = await query.to_list()
+    
+    # Auto-sync if empty and PAT is configured
+    if not results and not refresh:
+        settings = await AppSettings.get_app_settings()
+        github_pat = settings.get_github_pat()
+        if github_pat and repo.owner and repo.repo_name:
+            try:
+                service = GitHubInsightsService(github_pat)
+                await service.sync_pull_requests(repo, state)
+                # Re-query after sync
+                results = await query.to_list()
+            except Exception:
+                pass  # Return empty list if auto-sync fails
+    
+    return results
 
 
 @router.get("/repos/{repo_id}/pr-review-stats")
@@ -385,7 +445,22 @@ async def get_repository_contributors(
     if active_only:
         query = query.find(Contributor.is_active == True)
     
-    return await query.sort(-Contributor.commits_count).limit(limit).to_list()
+    results = await query.sort(-Contributor.commits_count).limit(limit).to_list()
+    
+    # Auto-sync if empty and PAT is configured
+    if not results and not refresh:
+        settings = await AppSettings.get_app_settings()
+        github_pat = settings.get_github_pat()
+        if github_pat and repo.owner and repo.repo_name:
+            try:
+                service = GitHubInsightsService(github_pat)
+                await service.sync_contributors(repo)
+                # Re-query after sync
+                results = await query.sort(-Contributor.commits_count).limit(limit).to_list()
+            except Exception:
+                pass  # Return empty list if auto-sync fails
+    
+    return results
 
 
 @router.get("/repos/{repo_id}/contributor-analytics")
