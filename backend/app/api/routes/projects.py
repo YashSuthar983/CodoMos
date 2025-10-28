@@ -192,6 +192,17 @@ class ProjectMemberByEmail(BaseModel):
     role: Optional[str] = "contributor"
 
 
+async def _get_user_by_id_any(user_id: str) -> User | None:
+    """Fetch user by matching ID as string - workaround for bson_encoders issue."""
+    # Due to User model having bson_encoders={ObjectId: str}, we need to 
+    # fetch all users and match by string comparison
+    all_users = await User.find_all().to_list()
+    for user in all_users:
+        if str(user.id) == str(user_id):
+            return user
+    return None
+
+
 @router.get("/{project_id}/members", response_model=List[ProjectMemberOut])
 async def list_project_members(project_id: str, current_user: User = Depends(get_current_user)):
     project = await Project.get(PydanticObjectId(project_id))
@@ -200,18 +211,92 @@ async def list_project_members(project_id: str, current_user: User = Depends(get
     return project.members or []
 
 
-@router.post("/{project_id}/members", response_model=ProjectOut)
-async def add_project_member(project_id: str, payload: ProjectMemberIn, current_user: User = Depends(get_current_user)):
+@router.get("/{project_id}/members/stats")
+async def get_project_member_stats(project_id: str, current_user: User = Depends(get_current_user)):
+    """Get detailed stats for all team members in a project"""
+    from app.models import XPEvent
+    
     project = await Project.get(PydanticObjectId(project_id))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    # Validate user exists
+    
+    member_stats = []
+    for member in project.members or []:
+        user = await _get_user_by_id_any(str(member.user_id))
+        if not user:
+            continue
+        
+        # Get XP events for this user
+        xp_events = await XPEvent.find(XPEvent.person_id == user.id).to_list()
+        total_xp = sum(event.amount for event in xp_events)
+        
+        # Calculate XP by skill
+        xp_by_skill = {}
+        for event in xp_events:
+            if event.skill_distribution:
+                for skill, amount in event.skill_distribution.items():
+                    xp_by_skill[skill] = xp_by_skill.get(skill, 0) + amount
+        
+        # Get recent activity (last 5 events)
+        recent_events = await XPEvent.find(
+            XPEvent.person_id == user.id
+        ).sort(-XPEvent.created_at).limit(5).to_list()
+        
+        member_stats.append({
+            "user_id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name or "Unknown",
+            "position": user.position,
+            "role": member.role,
+            "added_at": member.added_at.isoformat() if member.added_at else None,
+            "stats": {
+                "total_xp": total_xp,
+                "xp_events_count": len(xp_events),
+                "xp_by_skill": xp_by_skill,
+                "top_skill": max(xp_by_skill.items(), key=lambda x: x[1])[0] if xp_by_skill else None,
+            },
+            "recent_activity": [
+                {
+                    "source": event.source,
+                    "amount": event.amount,
+                    "created_at": event.created_at.isoformat() if event.created_at else None
+                }
+                for event in recent_events
+            ]
+        })
+    
+    # Sort by total XP descending
+    member_stats.sort(key=lambda x: x["stats"]["total_xp"], reverse=True)
+    
+    return {
+        "project_id": str(project.id),
+        "project_name": project.name,
+        "member_count": len(member_stats),
+        "total_project_xp": sum(m["stats"]["total_xp"] for m in member_stats),
+        "members": member_stats
+    }
+
+
+@router.post("/{project_id}/members", response_model=ProjectOut)
+async def add_project_member(project_id: str, payload: ProjectMemberIn, current_user: User = Depends(get_current_user)):
+    print(f"[projects.add_member] project_id={project_id} payload.user_id={payload.user_id} payload.role={payload.role}")
+    # Find project
     try:
-        user = await User.get(PydanticObjectId(payload.user_id))
-    except Exception:
-        user = None
+        project = await Project.get(PydanticObjectId(project_id))
+    except Exception as e:
+        print(f"[projects.add_member] Invalid project_id format: {project_id} error={e}")
+        raise HTTPException(status_code=400, detail=f"Invalid project ID format: {project_id}")
+    
+    if not project:
+        print(f"[projects.add_member] Project not found for id={project_id}")
+        raise HTTPException(status_code=404, detail=f"Project not found with ID: {project_id}")
+    
+    # Validate user exists
+    user = await _get_user_by_id_any(payload.user_id)
+    print(f"[projects.add_member] user_lookup id={payload.user_id} found={bool(user)}")
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        print(f"[projects.add_member] User not found for id={payload.user_id}")
+        raise HTTPException(status_code=404, detail=f"User not found with ID: {payload.user_id}")
     # Upsert member
     members = project.members or []
     found = False
@@ -225,6 +310,7 @@ async def add_project_member(project_id: str, payload: ProjectMemberIn, current_
         members.append(ProjectMember(user_id=user.id, role=payload.role or "contributor"))
     project.members = members
     await project.save()
+    print(f"[projects.add_member] member upserted for user_id={user.id} role={payload.role}")
     return project
 
 

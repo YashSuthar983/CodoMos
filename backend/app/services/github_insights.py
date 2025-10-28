@@ -301,8 +301,10 @@ class GitHubInsightsService:
                 committer_login = getattr(getattr(c.committer, "login", None), "__str__", lambda: None)()
                 author_date = self._to_naive(getattr(c.commit.author, "date", None))
                 commit_date = self._to_naive(getattr(c.commit.committer, "date", None))
-                verified = bool(getattr(c.commit.verification, "verified", False))
-                verification_reason = getattr(c.commit.verification, "reason", None)
+                # Safely handle verification (some commits may not have this attribute)
+                verification = getattr(c.commit, "verification", None)
+                verified = bool(getattr(verification, "verified", False)) if verification else False
+                verification_reason = getattr(verification, "reason", None) if verification else None
                 existing = await Commit.find_one(Commit.repo_id == repo.id, Commit.sha == c.sha)
                 if not existing:
                     existing = Commit(

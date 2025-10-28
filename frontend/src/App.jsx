@@ -4,11 +4,10 @@ import { Box } from '@chakra-ui/react'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 
+import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
-import Candidates from './pages/Candidates'
-import Roles from './pages/Roles'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import ProjectNew from './pages/ProjectNew'
@@ -21,24 +20,24 @@ import Settings from './pages/Settings'
 import Users from './pages/Users'
 import EmployeeProfile from './pages/EmployeeProfile'
 import Leaderboard from './pages/Leaderboard'
+import UnifiedHiringDashboard from './pages/UnifiedHiringDashboard'
+import JobDetail from './pages/JobDetail'
+import CandidateDetail from './pages/CandidateDetail'
+import HiringTasks from './pages/HiringTasks'
+import Analytics from './pages/Analytics'
+import PerformanceReviews from './pages/PerformanceReviews'
+import Goals from './pages/Goals'
+import OneOnOneMeetings from './pages/OneOnOneMeetings'
+import CandidatePortal from './pages/CandidatePortal'
 
 export default function App() {
   return (
     <Box minH="100vh">
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/public/forms/:id" element={<PublicForm />} />
-
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
 
         <Route
           path="/dashboard"
@@ -49,25 +48,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/candidate-portal"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <CandidatePortal />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route
-          path="/candidates"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Candidates />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/roles"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Roles />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/projects"
           element={
@@ -164,6 +154,78 @@ export default function App() {
             <ProtectedRoute>
               <Navbar />
               <Leaderboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <UnifiedHiringDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring/jobs/:jobId"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <JobDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring/candidates/:candidateId"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <CandidateDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hiring/tasks"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <HiringTasks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/reviews"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <PerformanceReviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/goals"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <Goals />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/performance/meetings"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <OneOnOneMeetings />
             </ProtectedRoute>
           }
         />

@@ -5,6 +5,8 @@ from beanie import PydanticObjectId
 
 from app.core.config import settings
 from app.models import User
+from app.db.mongo import get_client
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
@@ -38,3 +40,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         raise credentials_exception
     
     return user
+
+
+async def get_db() -> AsyncIOMotorDatabase:
+    """Provide a Motor database instance for routes that use raw MongoDB ops.
+
+    Uses the initialized global AsyncIOMotorClient and returns the configured DB.
+    """
+    client = get_client()
+    return client[settings.MONGODB_DB]

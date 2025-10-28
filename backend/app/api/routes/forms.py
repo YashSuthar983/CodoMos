@@ -57,9 +57,29 @@ async def update_form(form_id: str, payload: FormUpdate, current_user: User = De
     form = await Form.get(PydanticObjectId(form_id))
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
+    
+    # Check if published status is being changed
+    published_changed = "published" in payload.dict(exclude_unset=True)
+    
     for field, value in payload.dict(exclude_unset=True).items():
         setattr(form, field, value)
     await form.save()
+    
+    # Sync back to job if this form is linked to a job posting
+    if published_changed and form.mapping and form.mapping.get("entity_type") == "candidate":
+        job_posting_id = form.mapping.get("job_posting_id")
+        if job_posting_id:
+            try:
+                from app.models import JobPosting
+                job = await JobPosting.get(PydanticObjectId(job_posting_id))
+                if job:
+                    # Sync form published status to job is_public
+                    job.is_public = form.published
+                    await job.save()
+            except Exception:
+                # Don't fail form update if job sync fails
+                pass
+    
     return form
 
 
@@ -68,8 +88,61 @@ async def submit_form(form_id: str, payload: FormResponseCreate):
     form = await Form.get(PydanticObjectId(form_id))
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
+    
     resp = FormResponse(form_id=PydanticObjectId(form_id), mapped_entity=payload.mapped_entity, payload=payload.payload)
     await resp.insert()
+
+    # Auto-create candidate if this is a job application form
+    if form.mapping and form.mapping.get("entity_type") == "candidate":
+        job_posting_id = form.mapping.get("job_posting_id")
+        
+        # Extract candidate data from form payload
+        form_data = payload.payload
+        
+        # Check if candidate already exists
+        existing = await Candidate.find_one(Candidate.email == form_data.get("email"))
+        
+        if not existing:
+            # Create new candidate from form submission
+            candidate = Candidate(
+                full_name=form_data.get("full_name", "Unknown"),
+                email=form_data.get("email"),
+                phone=form_data.get("phone"),
+                position_applied=form_data.get("position", "Not specified"),
+                linkedin_url=form_data.get("linkedin_url"),
+                github_username=form_data.get("github_username"),
+                resume_url=form_data.get("resume_url"),
+                expected_salary=float(form_data.get("expected_salary")) if form_data.get("expected_salary") else None,
+                source="Application Form",
+                application_form_id=form.id,
+                form_responses=[resp.id],
+                notes=f"Motivation: {form_data.get('motivation', '')}\n\nExperience: {form_data.get('experience', '')}\n\nSkills: {form_data.get('skills', '')}"
+            )
+            await candidate.insert()
+            
+            # Update form response to link to candidate
+            resp.mapped_entity = {"type": "candidate", "id": str(candidate.id)}
+            await resp.save()
+            
+            # If job posting exists, get its title for position
+            if job_posting_id:
+                try:
+                    from app.models import JobPosting
+                    job = await JobPosting.get(PydanticObjectId(job_posting_id))
+                    if job:
+                        candidate.position_applied = job.title
+                        await candidate.save()
+                except Exception:
+                    pass
+        else:
+            # Update existing candidate with form response
+            if resp.id not in existing.form_responses:
+                existing.form_responses.append(resp.id)
+                await existing.save()
+            
+            # Update form response to link to existing candidate
+            resp.mapped_entity = {"type": "candidate", "id": str(existing.id)}
+            await resp.save()
 
     # Basic triggers
     if form.triggers:
