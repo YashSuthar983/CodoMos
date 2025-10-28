@@ -51,7 +51,7 @@ __all__ = [
     "Contributor", "Release", "Milestone", "ProjectBoard", "Activity",
     "XPLeaderboard", "IssueState", "PRState",
     "Message", "Attachment", "Channel", "Announcement", "Notification",
-    "NotificationPreference", "EmailTemplate"
+    "NotificationPreference", "EmailTemplate",
     "PerformanceReview", "Goal", "OneOnOneMeeting", "PerformanceImprovementPlan",
     "ReviewCycle", "MeetingTemplate", "ReviewStatus", "GoalStatus", "MeetingStatus"
 ]
